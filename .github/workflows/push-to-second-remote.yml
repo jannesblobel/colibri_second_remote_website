@@ -30,18 +30,30 @@ jobs:
         run: |
           set -e  # Exit on error
           
-          # Extract repo path from URL (handles both https:// and git@ formats)
+          # Debug: Check URL format (without exposing full value)
+          URL_LENGTH=${#SECOND_REMOTE_URL}
+          echo "SECOND_REMOTE_URL length: ${URL_LENGTH} characters"
+          echo "SECOND_REMOTE_URL starts with: ${SECOND_REMOTE_URL:0:20}..."
+          
+          # Extract repo path from URL using multiple methods
           REPO_PATH=""
           
-          # Handle https://github.com/username/repo.git format
-          if [[ "$SECOND_REMOTE_URL" =~ ^https://github\.com/([^/]+/[^/]+) ]]; then
+          # Method 1: Handle https://github.com/username/repo.git format
+          if [[ "$SECOND_REMOTE_URL" =~ https://github\.com/([^/]+/[^/]+) ]]; then
             REPO_PATH="${BASH_REMATCH[1]}"
-          # Handle git@github.com:username/repo.git format
-          elif [[ "$SECOND_REMOTE_URL" =~ ^git@github\.com:([^/]+/[^/]+) ]]; then
+            echo "Matched https:// format"
+          # Method 2: Handle git@github.com:username/repo.git format
+          elif [[ "$SECOND_REMOTE_URL" =~ git@github\.com:([^/]+/[^/]+) ]]; then
             REPO_PATH="${BASH_REMATCH[1]}"
-          # Handle github.com/username/repo.git format (without protocol)
+            echo "Matched git@ format"
+          # Method 3: Handle github.com/username/repo.git format (without protocol)
           elif [[ "$SECOND_REMOTE_URL" =~ github\.com[:/]([^/]+/[^/]+) ]]; then
             REPO_PATH="${BASH_REMATCH[1]}"
+            echo "Matched github.com format"
+          # Method 4: If URL is just username/repo format
+          elif [[ "$SECOND_REMOTE_URL" =~ ^[^/]+/[^/]+ ]]; then
+            REPO_PATH="$SECOND_REMOTE_URL"
+            echo "Matched direct username/repo format"
           fi
           
           # Remove .git suffix if present
@@ -49,18 +61,23 @@ jobs:
           
           if [ -z "$REPO_PATH" ]; then
             echo "Error: Could not parse SECOND_REMOTE_URL"
-            echo "Please ensure SECOND_REMOTE_URL is in format: https://github.com/username/repo"
+            echo "URL format check failed. Please ensure SECOND_REMOTE_URL is one of:"
+            echo "  - https://github.com/username/repo"
+            echo "  - git@github.com:username/repo"
+            echo "  - username/repo"
             exit 1
           fi
           
-          # Validate REPO_PATH format (should be username/repo)
-          if [[ ! "$REPO_PATH" =~ ^[^/]+/[^/]+$ ]]; then
-            echo "Error: Invalid repository path format: ${REPO_PATH}"
-            echo "Expected format: username/repository"
+          # Validate REPO_PATH format (should be username/repo, no special characters)
+          if [[ ! "$REPO_PATH" =~ ^[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+$ ]]; then
+            echo "Error: Invalid repository path format detected"
+            echo "Extracted path contains invalid characters or format"
+            echo "Path length: ${#REPO_PATH}"
+            echo "Please ensure SECOND_REMOTE_URL contains a valid GitHub repository path"
             exit 1
           fi
           
-          echo "Repository path: ${REPO_PATH}"
+          echo "Repository path extracted: ${REPO_PATH}"
           
           # Construct authenticated URL
           # Format: https://TOKEN@github.com/owner/repo.git
@@ -76,8 +93,19 @@ jobs:
           fi
           
           # Verify remote configuration (mask PAT in output)
-          echo "Remote configuration:"
+          echo "Remote URL (masked):"
           git remote get-url second-remote | sed 's/:[^@]*@/:***@/g'
+          
+          # Test the remote connection
+          echo "Testing remote connection..."
+          git ls-remote second-remote HEAD > /dev/null 2>&1 || {
+            echo "Error: Cannot access remote repository"
+            echo "Please verify:"
+            echo "  1. GIT_PAT has 'repo' permissions"
+            echo "  2. GIT_PAT has access to the target repository"
+            echo "  3. SECOND_REMOTE_URL is correct: username/repo-name"
+            exit 1
+          }
           
           # Push to second remote
           echo "Pushing to second remote: ${REPO_PATH}"
