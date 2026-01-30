@@ -108,36 +108,52 @@ jobs:
             echo "PAT validation successful"
           fi
           
-          # Use a clean URL without auth embedded
-          BASE_URL="https://github.com/${REPO_PATH}.git"
+          # Construct authenticated URL with PAT embedded
+          # For GitHub, we can use the PAT directly as the username
+          # Format: https://TOKEN@github.com/owner/repo.git
+          AUTH_URL="https://${GIT_PAT}@github.com/${REPO_PATH}.git"
           
-          # Add or update remote (without auth in URL)
+          # Verify the URL components are correct
+          echo "Repository path: ${REPO_PATH}"
+          echo "URL structure: https://***@github.com/${REPO_PATH}.git"
+          
+          # Add or update remote with authenticated URL
           if git remote | grep -q "^second-remote$"; then
             echo "Updating existing second-remote"
-            git remote set-url second-remote "$BASE_URL"
+            git remote set-url second-remote "$AUTH_URL"
           else
             echo "Adding new second-remote"
-            git remote add second-remote "$BASE_URL"
+            git remote add second-remote "$AUTH_URL"
           fi
           
-          # Use git credential store with proper format for GitHub PATs
-          git config --global credential.helper store
-          # Format: https://x-access-token:TOKEN@github.com
-          echo "https://x-access-token:${GIT_PAT}@github.com" > ~/.git-credentials
-          chmod 600 ~/.git-credentials
+          # Verify the remote was set correctly by checking the path
+          VERIFY_URL=$(git remote get-url second-remote)
+          echo "Verifying remote URL..."
           
-          # Verify the credentials file was created
-          if [ -f ~/.git-credentials ]; then
-            echo "Credential helper configured successfully"
-            # Verify it contains the right format (without exposing PAT)
-            if grep -q "x-access-token" ~/.git-credentials; then
-              echo "Credentials file format verified"
+          # Test if we can parse the URL back
+          if echo "$VERIFY_URL" | grep -q "github.com"; then
+            EXTRACTED_PATH=$(echo "$VERIFY_URL" | sed -E 's|https://[^@]+@github.com/([^/]+/[^/]+)\.git|\1|')
+            if [ "$EXTRACTED_PATH" = "$REPO_PATH" ]; then
+              echo "✓ Remote URL verified - path matches: ${REPO_PATH}"
+            else
+              echo "✗ Path mismatch!"
+              echo "  Expected: ${REPO_PATH}"
+              echo "  Got: ${EXTRACTED_PATH}"
+              echo "  Full URL (masked): $(echo "$VERIFY_URL" | sed 's/:[^@]*@/:***@/g')"
             fi
           else
-            echo "Warning: Credentials file was not created"
+            echo "✗ Remote URL doesn't contain github.com"
+            echo "  URL (masked): $(echo "$VERIFY_URL" | sed 's/:[^@]*@/:***@/g')"
           fi
           
-          echo "Remote URL: ${BASE_URL}"
+          # Also test the URL format with curl to see if it's accessible
+          echo "Testing URL accessibility..."
+          TEST_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -u "${GIT_PAT}:x-oauth-basic" "https://api.github.com/repos/${REPO_PATH}")
+          if [ "$TEST_RESPONSE" = "200" ]; then
+            echo "✓ URL format is correct and accessible"
+          else
+            echo "✗ URL test returned: ${TEST_RESPONSE}"
+          fi
           
           # Test repository access via API first
           echo "Testing repository access via API..."
