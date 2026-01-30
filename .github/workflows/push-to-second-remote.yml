@@ -1,0 +1,53 @@
+name: Push to Second Remote
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  push-to-remote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags
+      
+      - name: Configure Git
+        run: |
+          git config user.name "${{ secrets.GIT_USER_NAME || 'GitHub Actions' }}"
+          git config user.email "${{ secrets.GIT_USER_EMAIL }}"
+      
+      - name: Push to second remote
+        env:
+          GIT_PAT: "${{ secrets.GIT_PAT }}"
+          SECOND_REMOTE_URL: "${{ secrets.SECOND_REMOTE_URL }}"
+        run: |
+          # Extract repo path from URL (handles both https:// and git@ formats)
+          if [[ "$SECOND_REMOTE_URL" =~ github\.com[:/]([^/]+/[^/]+) ]]; then
+            REPO_PATH="${BASH_REMATCH[1]}"
+            # Remove .git suffix if present
+            REPO_PATH="${REPO_PATH%.git}"
+            
+            # Construct authenticated URL
+            AUTH_URL="https://${GIT_PAT}@github.com/${REPO_PATH}.git"
+            
+            # Add or update remote
+            if git remote | grep -q "^second-remote$"; then
+              git remote set-url second-remote "$AUTH_URL"
+            else
+              git remote add second-remote "$AUTH_URL"
+            fi
+            
+            # Push to second remote
+            echo "Pushing to second remote: ${REPO_PATH}"
+            git push second-remote main || git push second-remote main --force
+          else
+            echo "Error: Could not parse SECOND_REMOTE_URL"
+            exit 1
+          fi
