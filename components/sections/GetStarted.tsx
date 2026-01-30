@@ -30,11 +30,11 @@ const GetStarted = () => {
         <h2 className="text-4xl font-semibold">{data.title}</h2>
         <h3 className="text-lg font-regular text-muted-foreground max-w-[450px] mx-auto text-center">{data.description}</h3>
         <div className="w-full flex flex-col gap-0.5 items-end max-w-[508px] mx-auto font-mono text-xl pr-4 pt-12">
-          {data.urls.map((url) => (
-            <div key={url[0]}>
-              {url.map((section) => (
+          {data.urls.map((url, urlIndex) => (
+            <div key={url[0] + urlIndex}>
+              {url.map((section, index) => (
                 section === "g" ? (
-                  <Tooltip key={section} open={true}>
+                  <Tooltip key={section + index} open={true}>
                     <TooltipTrigger asChild>
                       <span className="text-pink-900 bg-pink-500/20 px-0.5 cursor-help">{section}</span>
                     </TooltipTrigger>
