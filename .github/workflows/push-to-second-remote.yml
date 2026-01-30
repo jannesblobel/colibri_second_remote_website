@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Fetch all history for all branches and tags
+          persist-credentials: false # Don't persist credentials to avoid conflicts
       
       - name: Configure Git
         run: |
@@ -112,29 +113,42 @@ jobs:
             echo "PAT validation successful"
           fi
           
-          # Clear any existing credential helpers that might interfere
+          # Clear all credential sources that might interfere
           # This prevents Git from using github-actions[bot] credentials
           git config --global --unset credential.helper || true
           git config --global --unset-all credential.helper || true
+          git config --local --unset credential.helper || true
+          git config --local --unset-all credential.helper || true
           
-          # Use credential helper to store PAT
-          # This ensures Git uses the PAT instead of github-actions[bot]
-          git config --global credential.helper store
+          # Clear any credential cache
+          git credential-cache exit 2>/dev/null || true
+          printf "protocol=https\nhost=github.com\n" | git credential reject 2>/dev/null || true
+          
+          # Create a simple askpass script that returns the PAT
+          # This ensures Git always uses our PAT when it asks for credentials
+          echo "#!/bin/bash" > /tmp/git-askpass.sh
+          echo "echo '${GIT_PAT}'" >> /tmp/git-askpass.sh
+          chmod +x /tmp/git-askpass.sh
+          export GIT_ASKPASS=/tmp/git-askpass.sh
+          export GIT_TERMINAL_PROMPT=0
+          export DISPLAY=:0
+          
+          # Also set credential helper as backup
+          git config --global credential.https://github.com.helper store
           echo "https://${GIT_PAT}@github.com" > ~/.git-credentials
           chmod 600 ~/.git-credentials
           
-          # Add remote WITHOUT embedding PAT in URL (credential helper will provide it)
-          REMOTE_URL="https://github.com/${REPO_PATH}.git"
-          if git remote | grep -q "^second-remote$"; then
-            echo "Updating existing second-remote"
-            git remote set-url second-remote "$REMOTE_URL"
-          else
-            echo "Adding new second-remote"
-            git remote add second-remote "$REMOTE_URL"
-          fi
+          # Remove any existing second-remote to start fresh
+          git remote remove second-remote 2>/dev/null || true
+          
+          # Add remote with PAT embedded in URL
+          # Git will use the PAT from URL, or askpass, or credential helper
+          AUTH_URL="https://${GIT_PAT}@github.com/${REPO_PATH}.git"
+          echo "Adding second-remote with authentication"
+          git remote add second-remote "$AUTH_URL"
           
           echo "Repository path: ${REPO_PATH}"
-          echo "Remote URL configured (credential helper will provide authentication)"
+          echo "Remote URL configured with multiple authentication methods (URL, askpass, credential helper)"
           
           # Test repository access via API first
           echo "Testing repository access via API..."
