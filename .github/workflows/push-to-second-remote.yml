@@ -112,36 +112,78 @@ jobs:
           echo "Remote URL (masked):"
           git remote get-url second-remote | sed 's/:[^@]*@/:***@/g'
           
+          # Test repository access via API first
+          echo "Testing repository access via API..."
+          REPO_ACCESS=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token ${GIT_PAT}" "https://api.github.com/repos/${REPO_PATH}")
+          if [ "$REPO_ACCESS" != "200" ]; then
+            echo "API test returned HTTP ${REPO_ACCESS}"
+            if [ "$REPO_ACCESS" = "404" ]; then
+              echo "Repository not found or PAT doesn't have access to: ${REPO_PATH}"
+            elif [ "$REPO_ACCESS" = "401" ]; then
+              echo "Authentication failed - PAT may be invalid or expired"
+            else
+              echo "Unexpected error accessing repository"
+            fi
+            echo ""
+            echo "Please verify:"
+            echo "  1. Repository exists: https://github.com/${REPO_PATH}"
+            echo "  2. PAT has 'repo' scope and access to this repository"
+            exit 1
+          else
+            echo "API access test successful - repository is accessible"
+          fi
+          
           # Test the remote connection with better error output
-          echo "Testing remote connection..."
+          echo "Testing git remote connection..."
+          set +e  # Temporarily disable exit on error to capture output
           CONNECTION_OUTPUT=$(git ls-remote second-remote HEAD 2>&1)
           CONNECTION_EXIT=$?
+          set -e  # Re-enable exit on error
+          
           if [ $CONNECTION_EXIT -ne 0 ]; then
+            echo "Git error output:"
             echo "$CONNECTION_OUTPUT"
             echo ""
             echo "=========================================="
-            echo "Error: Cannot access remote repository"
+            echo "Error: Cannot access remote via git"
             echo "=========================================="
             echo ""
-            echo "Troubleshooting steps:"
-            echo "1. Verify GIT_PAT is a valid Personal Access Token (classic)"
-            echo "2. Ensure GIT_PAT has 'repo' scope enabled"
-            echo "3. Check that GIT_PAT has access to repository: ${REPO_PATH}"
-            echo "4. Verify SECOND_REMOTE_URL is correct"
-            echo "5. Make sure the target repository exists and is accessible"
+            echo "Repository path: ${REPO_PATH}"
+            echo "API access works, but git access failed."
             echo ""
-            echo "To test your PAT manually, run:"
-            echo "  curl -H 'Authorization: token YOUR_PAT' https://api.github.com/repos/${REPO_PATH}"
+            echo "Possible causes:"
+            echo "  1. Repository might be empty (no commits yet)"
+            echo "  2. Default branch might not be 'main'"
+            echo "  3. URL construction issue"
             echo ""
-            exit 1
+            echo "Attempting to push anyway (this might work if repo is empty)..."
+          else
+            echo "Git connection test successful!"
           fi
-          
-          echo "Connection test successful!"
           
           # Push to second remote
           echo "Pushing to second remote: ${REPO_PATH}"
-          git push second-remote main || {
+          set +e  # Temporarily disable exit on error
+          PUSH_OUTPUT=$(git push second-remote main 2>&1)
+          PUSH_EXIT=$?
+          set -e  # Re-enable exit on error
+          
+          if [ $PUSH_EXIT -ne 0 ]; then
+            echo "Push output:"
+            echo "$PUSH_OUTPUT"
             echo ""
-            echo "Push failed. Attempting with force..."
-            git push second-remote main --force
-          }
+            
+            # Check if it's because the remote branch doesn't exist (empty repo)
+            if echo "$PUSH_OUTPUT" | grep -q "no upstream branch"; then
+              echo "Remote branch doesn't exist. Setting upstream and pushing..."
+              git push -u second-remote main || git push -u second-remote main --force
+            elif echo "$PUSH_OUTPUT" | grep -q "rejected"; then
+              echo "Push was rejected. Attempting with force..."
+              git push second-remote main --force
+            else
+              echo "Push failed with error. See output above."
+              exit 1
+            fi
+          else
+            echo "Push successful!"
+          fi
