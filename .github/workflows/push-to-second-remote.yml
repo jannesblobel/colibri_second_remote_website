@@ -33,243 +33,70 @@ jobs:
           GIT_PAT: "${{ secrets.GIT_PAT }}"
           SECOND_REMOTE_URL: "${{ secrets.SECOND_REMOTE_URL }}"
         run: |
-          set -e  # Exit on error
+          set -e
           
-          # Debug: Check URL format (without exposing full value)
-          URL_LENGTH=${#SECOND_REMOTE_URL}
-          echo "SECOND_REMOTE_URL length: ${URL_LENGTH} characters"
-          echo "SECOND_REMOTE_URL starts with: ${SECOND_REMOTE_URL:0:20}..."
-          
-          # Extract repo path from URL using multiple methods
+          # Extract repository path from URL
           REPO_PATH=""
-          
-          # Method 1: Handle https://github.com/username/repo.git format
           if [[ "$SECOND_REMOTE_URL" =~ https://github\.com/([^/]+/[^/]+) ]]; then
             REPO_PATH="${BASH_REMATCH[1]}"
-            echo "Matched https:// format"
-          # Method 2: Handle git@github.com:username/repo.git format
           elif [[ "$SECOND_REMOTE_URL" =~ git@github\.com:([^/]+/[^/]+) ]]; then
             REPO_PATH="${BASH_REMATCH[1]}"
-            echo "Matched git@ format"
-          # Method 3: Handle github.com/username/repo.git format (without protocol)
           elif [[ "$SECOND_REMOTE_URL" =~ github\.com[:/]([^/]+/[^/]+) ]]; then
             REPO_PATH="${BASH_REMATCH[1]}"
-            echo "Matched github.com format"
-          # Method 4: If URL is just username/repo format
           elif [[ "$SECOND_REMOTE_URL" =~ ^[^/]+/[^/]+ ]]; then
             REPO_PATH="$SECOND_REMOTE_URL"
-            echo "Matched direct username/repo format"
           fi
           
-          # Remove .git suffix if present
           REPO_PATH="${REPO_PATH%.git}"
           
-          if [ -z "$REPO_PATH" ]; then
-            echo "Error: Could not parse SECOND_REMOTE_URL"
-            echo "URL format check failed. Please ensure SECOND_REMOTE_URL is one of:"
-            echo "  - https://github.com/username/repo"
-            echo "  - git@github.com:username/repo"
-            echo "  - username/repo"
+          if [ -z "$REPO_PATH" ] || [[ ! "$REPO_PATH" =~ ^[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+$ ]]; then
+            echo "Error: Could not parse SECOND_REMOTE_URL. Expected format: username/repo or https://github.com/username/repo"
             exit 1
           fi
           
-          # Validate REPO_PATH format (should be username/repo, no special characters)
-          if [[ ! "$REPO_PATH" =~ ^[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+$ ]]; then
-            echo "Error: Invalid repository path format detected"
-            echo "Extracted path contains invalid characters or format"
-            echo "Path length: ${#REPO_PATH}"
-            echo "Please ensure SECOND_REMOTE_URL contains a valid GitHub repository path"
-            exit 1
-          fi
-          
-          echo "Repository path extracted: ${REPO_PATH}"
-          
-          # Validate REPO_PATH is correct format
-          if [[ ! "$REPO_PATH" =~ ^[^/]+/[^/]+$ ]]; then
-            echo "Error: Invalid repository path format: '${REPO_PATH}'"
-            echo "Expected format: username/repository"
-            echo "Please check your SECOND_REMOTE_URL secret"
-            exit 1
-          fi
-          
-          # Validate PAT is not empty
           if [ -z "$GIT_PAT" ]; then
-            echo "Error: GIT_PAT secret is empty or not set"
+            echo "Error: GIT_PAT secret is not set"
             exit 1
           fi
           
-          # Verify PAT doesn't contain characters that would break URL
-          if echo "$GIT_PAT" | grep -qE '[[:space:]]|"|'"'"'|`'; then
-            echo "Warning: PAT may contain characters that could break URL"
-          fi
-          
-          # Test PAT validity by making an API call
-          echo "Validating PAT..."
-          PAT_TEST=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token ${GIT_PAT}" "https://api.github.com/user")
-          if [ "$PAT_TEST" != "200" ]; then
-            echo "Warning: PAT validation returned HTTP ${PAT_TEST}"
-            echo "This might indicate the PAT is invalid or lacks permissions"
-          else
-            echo "PAT validation successful"
-          fi
-          
-          # Clear all credential sources that might interfere
-          # This prevents Git from using github-actions[bot] credentials
-          git config --global --unset credential.helper || true
+          # Clear existing credential helpers to prevent using github-actions[bot] credentials
           git config --global --unset-all credential.helper || true
-          git config --local --unset credential.helper || true
           git config --local --unset-all credential.helper || true
-          
-          # Clear any credential cache
           git credential-cache exit 2>/dev/null || true
-          printf "protocol=https\nhost=github.com\n" | git credential reject 2>/dev/null || true
           
-          # Create a simple askpass script that returns the PAT
-          # This ensures Git always uses our PAT when it asks for credentials
+          # Set up authentication: askpass script and credential helper
           echo "#!/bin/bash" > /tmp/git-askpass.sh
           echo "echo '${GIT_PAT}'" >> /tmp/git-askpass.sh
           chmod +x /tmp/git-askpass.sh
           export GIT_ASKPASS=/tmp/git-askpass.sh
           export GIT_TERMINAL_PROMPT=0
-          export DISPLAY=:0
           
-          # Also set credential helper as backup
           git config --global credential.https://github.com.helper store
           echo "https://${GIT_PAT}@github.com" > ~/.git-credentials
           chmod 600 ~/.git-credentials
           
-          # Remove any existing second-remote to start fresh
+          # Configure remote with PAT in URL
           git remote remove second-remote 2>/dev/null || true
+          git remote add second-remote "https://${GIT_PAT}@github.com/${REPO_PATH}.git"
           
-          # Add remote with PAT embedded in URL
-          # Git will use the PAT from URL, or askpass, or credential helper
-          AUTH_URL="https://${GIT_PAT}@github.com/${REPO_PATH}.git"
-          echo "Adding second-remote with authentication"
-          git remote add second-remote "$AUTH_URL"
-          
-          echo "Repository path: ${REPO_PATH}"
-          echo "Remote URL configured with multiple authentication methods (URL, askpass, credential helper)"
-          
-          # Test repository access via API first
-          echo "Testing repository access via API..."
+          # Verify repository access
           REPO_ACCESS=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token ${GIT_PAT}" "https://api.github.com/repos/${REPO_PATH}")
           if [ "$REPO_ACCESS" != "200" ]; then
-            echo "API test returned HTTP ${REPO_ACCESS}"
-            if [ "$REPO_ACCESS" = "404" ]; then
-              echo "Repository not found or PAT doesn't have access to: ${REPO_PATH}"
-            elif [ "$REPO_ACCESS" = "401" ]; then
-              echo "Authentication failed - PAT may be invalid or expired"
-            else
-              echo "Unexpected error accessing repository"
-            fi
-            echo ""
-            echo "Please verify:"
-            echo "  1. Repository exists: https://github.com/${REPO_PATH}"
-            echo "  2. PAT has 'repo' scope and access to this repository"
+            echo "Error: Cannot access repository ${REPO_PATH} (HTTP ${REPO_ACCESS})"
+            echo "Please verify the repository exists and the PAT has access"
             exit 1
-          else
-            echo "API access test successful - repository is accessible"
           fi
           
-          # Check if repository is empty (no default branch)
-          echo "Checking if repository is empty..."
+          # Check if repository is empty
           REPO_INFO=$(curl -s -H "Authorization: token ${GIT_PAT}" "https://api.github.com/repos/${REPO_PATH}")
           DEFAULT_BRANCH=$(echo "$REPO_INFO" | grep -o '"default_branch":"[^"]*"' | cut -d'"' -f4 || echo "")
-          
-          if [ -z "$DEFAULT_BRANCH" ]; then
-            echo "Repository appears to be empty (no default branch)"
-            echo "Will push with upstream flag to create the branch"
-            IS_EMPTY=true
-          else
-            echo "Repository has default branch: ${DEFAULT_BRANCH}"
-            IS_EMPTY=false
-          fi
-          
-          # Test the remote connection (skip if empty repo)
-          if [ "$IS_EMPTY" = "false" ]; then
-            echo "Testing git remote connection..."
-            set +e  # Temporarily disable exit on error to capture output
-            CONNECTION_OUTPUT=$(git ls-remote second-remote HEAD 2>&1)
-            CONNECTION_EXIT=$?
-            set -e  # Re-enable exit on error
-            
-            if [ $CONNECTION_EXIT -ne 0 ]; then
-              echo "Git error output:"
-              echo "$CONNECTION_OUTPUT"
-              echo ""
-              echo "Warning: Could not access remote via git, but will attempt push anyway"
-            else
-              echo "Git connection test successful!"
-            fi
-          else
-            echo "Skipping git connection test (empty repository)"
-          fi
+          [ -z "$DEFAULT_BRANCH" ] && IS_EMPTY=true || IS_EMPTY=false
           
           # Push to second remote
-          echo "Pushing to second remote: ${REPO_PATH}"
-          
           if [ "$IS_EMPTY" = "true" ]; then
-            # For empty repos, use -u flag to set upstream and create the branch
-            echo "Pushing to empty repository with upstream flag..."
-            set +e
-            PUSH_OUTPUT=$(git push -u second-remote main 2>&1)
-            PUSH_EXIT=$?
-            set -e
-            
-            if [ $PUSH_EXIT -ne 0 ]; then
-              echo "Push output:"
-              echo "$PUSH_OUTPUT"
-              echo ""
-              echo "=========================================="
-              echo "Failed to push to empty repository"
-              echo "=========================================="
-              echo ""
-              echo "This can happen with empty repositories. Try one of these solutions:"
-              echo ""
-              echo "Option 1 (Recommended): Manually initialize the repository"
-              echo "  1. Clone your second remote repository locally"
-              echo "  2. Copy the contents from this repo"
-              echo "  3. Commit and push to create the initial branch"
-              echo "  4. Then this workflow will work for future pushes"
-              echo ""
-              echo "Option 2: Try pushing with explicit refspec"
-              echo "  The workflow will attempt this now..."
-              echo ""
-              
-              # Try with explicit refspec
-              git push -u second-remote HEAD:main || {
-                echo "Explicit refspec also failed."
-                echo ""
-                echo "Please manually initialize the repository, then this workflow"
-                echo "will work for all subsequent pushes."
-                exit 1
-              }
-            fi
-            echo "Push successful! Branch 'main' created on remote."
+            git push -u second-remote main
           else
-            # For non-empty repos, try normal push first
-            set +e  # Temporarily disable exit on error
-            PUSH_OUTPUT=$(git push second-remote main 2>&1)
-            PUSH_EXIT=$?
-            set -e  # Re-enable exit on error
-            
-            if [ $PUSH_EXIT -ne 0 ]; then
-              echo "Push output:"
-              echo "$PUSH_OUTPUT"
-              echo ""
-              
-              # Check if it's because the remote branch doesn't exist
-              if echo "$PUSH_OUTPUT" | grep -q "no upstream branch"; then
-                echo "Remote branch doesn't exist. Setting upstream and pushing..."
-                git push -u second-remote main
-              elif echo "$PUSH_OUTPUT" | grep -q "rejected"; then
-                echo "Push was rejected. Attempting with force..."
-                git push second-remote main --force
-              else
-                echo "Push failed with error. See output above."
-                exit 1
-              fi
-            else
-              echo "Push successful!"
-            fi
+            git push second-remote main || git push -u second-remote main
           fi
+          
+          echo "Successfully pushed to ${REPO_PATH}"
