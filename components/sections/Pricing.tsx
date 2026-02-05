@@ -16,42 +16,51 @@ const data = {
       name: "Open Source",
       for: "For public repos only.",
       features: [
-        "Public repositories",
-        "Unlimited collaborators",
-        "Unlimited edits",
+        "Unlimited anonymous editors",
+        "Unlimited history",
+        "Unlimited annotations",
+        "Realtime collaboration",
+        "PR's by Colibri",
+        "MDX support (coming soon)",
       ],
-      price: "$0",
-      priceText: "free forever",
+      price: "$ FREE",
+      priceText: "forever",
       cta: "Try now",
       cta_type: "outline"
     },
     {
       name: "Private",
-      badge: "Most popular",
-      for: "For private and public repos.",
+      for: "For private repos",
       features: [
-        "Public repositories",
-        "Private repositories",
-        "Unlimited collaborators",
-        "Unlimited edits",
+        "Unlimited anonymous editors",
+        "Unlimited history",
+        "Realtime collaboration",
+        "2 private files in a repo",
+        "20 annotations per file",
+        "up to 3 teammates",
+        
       ],
-      price: "$5",
-      priceText: "per seat/mo",
-      cta: "Upgrade",
-      cta_type: "default"
+      price: "$0",
+      priceText: "per month",
+      cta: "Get started",
+      cta_type: "outline"
     },
     {
       name: "Team",
-      for: "For private and public repos.",
+      badge: "Most popular",
+      for: "Coming soon (for private and public repos)",
       features: [
-        "Public repositories",
-        "Private repositories",
-        "Unlimited collaborators",
-        "Unlimited edits",
+      "Unlimited anonymous editors",
+      "Unlimited history",
+      "Unlimited private files",
+      "Unlimited annotations per file",
+      "Realtime collaboration",
+      "Custom Colibri ACCs (coming soon)",
+      "MDX support (coming soon)",
       ],
       price: "$XX",
-      priceText: "per mo",
-      cta: "Contact us",
+      priceText: "per month per seat",
+      cta: "Coming soon",
       cta_type: "outline"
     },
   ],
@@ -62,14 +71,14 @@ const Pricing = () => {
     <div className="w-full flex flex-col gap-4 mt-32">
       <h2 className="text-4xl font-semibold">{data.title}</h2>
       <h3 className="text-lg font-regular text-muted-foreground max-w-[480px] w-full mr-auto">{data.description}</h3>
-      <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-4 mt-12">
+      <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4 mt-12">
         {data.plans.map((plan) => (
           <div key={plan.name} className="flex flex-col gap-2 bg-white rounded-2xl p-5">
             <div>
               <h4 className="text-md font-semibold">{plan.name}</h4>
               <p className="text-sm font-regular text-muted-foreground leading-[0.8rem] pt-2">{plan.for}</p>
             </div>
-            <ul className="list-disc list-inside pt-4 space-y-1 text-muted-foreground h-[140px]">
+            <ul className="list-disc list-inside pt-4 space-y-1 text-muted-foreground h-[200px]">
               {plan.features.map((feature) => (
                 <li key={feature}>{feature}</li>
               ))}
