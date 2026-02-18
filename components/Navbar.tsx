@@ -20,10 +20,7 @@ const navItems = [
     label: "Pricing",
     href: "#pricing",
   },
-  {
-    label: "Contact",
-    href: "#contact",
-  },
+  
 ];
 
 const Navbar = () => {
