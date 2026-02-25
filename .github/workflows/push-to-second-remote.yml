@@ -10,7 +10,7 @@ jobs:
   push-to-remote:
     # Skip this workflow if running in the second remote repository
     # This prevents the workflow from running when it gets pushed to the second remote
-    if: github.repository != 'jannesblobel/second_remote_Colibri'
+    if: github.repository != 'jannesblobel/colibri_second_remote_website'
     
     runs-on: ubuntu-latest
     permissions:
@@ -25,13 +25,13 @@ jobs:
       
       - name: Configure Git
         run: |
-          git config user.name "${{ secrets.GIT_USER_NAME || 'GitHub Actions' }}"
-          git config user.email "${{ secrets.GIT_USER_EMAIL }}"
+          git config user.name "${{ secrets.JANNES_GIT_USERNAME || 'GitHub Actions' }}"
+          git config user.email "${{ secrets.JANNES_GIT_USER_EMAIL }}"
       
       - name: Push to second remote
         env:
-          GIT_PAT: "${{ secrets.GIT_PAT }}"
-          SECOND_REMOTE_URL: "${{ secrets.SECOND_REMOTE_URL }}"
+          GIT_PAT: "${{ secrets.JANNES_GIT_PAT }}"
+          SECOND_REMOTE_URL: "${{ secrets.JANNES_COLIBRI_SECND_REMOTE_WEBSITE_URL }}"
         run: |
           set -e
           
