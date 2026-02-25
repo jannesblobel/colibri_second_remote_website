@@ -4,7 +4,7 @@ const data = {
   title: "Edit Markdown together. Without leaving GitHub.",
   subheading: (<>
     <span className="font-semibold text-primary">
-      Hey Nils Colibri is a collaborative Markdown editor for GitHub repositories.
+      Colibri is a collaborative Markdown editor for GitHub repositories.
     </span>
     <br/>
     Open any <span className="bg-border rounded-md px-1 mx-0.5 py-0.5 text-primary/90">.md</span> file, edit in real time with your team, and merge it back as a clean pull request.
