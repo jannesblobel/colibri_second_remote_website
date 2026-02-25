@@ -17,7 +17,7 @@ const CTA = () => {
       repository: repo,
     });
 
-    const url = `https://app.get-colibri.com/?room_id=${encodeURIComponent(repo)}`;
+    const url = `https://app.get-colibri.com/?room_id=${encodeURIComponent(repo.replace("https://", ""))}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
