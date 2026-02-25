@@ -13,7 +13,7 @@ const navItems = [
   },
   {
     label: "Get Started",
-    href: "/get-started",
+    href: "#get-started",
   },
 ];
 
