@@ -9,7 +9,7 @@ const DEFAULT_REPO_URL = "github.com/Legit-Control/get-colibri/blob/main/README.
 
 const CTA = () => {
   const [value, setValue] = useState("");
-
+//TODO: all the URl handle stuff should go into the backend so that we don't have to handle it here.
   const handleClick = () => {
     const repo = value.trim() || DEFAULT_REPO_URL;
     posthog.capture("cta_clicked", {
