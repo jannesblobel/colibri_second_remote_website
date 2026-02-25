@@ -10,8 +10,7 @@ const data = {
       <span className="font-semibold text-primary">
         You can start Colibri for free on public repos.
       </span>{" "}
-      <br />
-      For open source project it stays free for ever. Once a repo is private the plan needs to be upgraded.
+     Once a repo is private the plan needs to be upgraded.
     </>
   ),
   plans: [
@@ -27,44 +26,39 @@ const data = {
         "MDX support (coming soon)",
       ],
       price: "$ FREE",
-      priceText: "forever",
+      priceText: undefined,
       cta: "Try now",
-      cta_type: "outline"
+      cta_type: "outline",
+      available: true,
     },
     {
       name: "Private",
+      priceText: undefined,
       for: "For private repos",
       features: [
-        "Unlimited anonymous editors",
-        "Unlimited history",
-        "Realtime collaboration",
-        "2 private files in a repo",
-        "20 annotations per file",
-        "up to 3 teammates",
-
+        "Everything in Open source",
+        "Private repositories",
+        "Up to 3 teammates",
+        "More coming soon"
       ],
-      price: "$0",
-      priceText: "per month",
-      cta: "Get started",
-      cta_type: "outline"
+      cta: "Coming soon",
+      cta_type: "outline",
+      available: false,
     },
     {
       name: "Team",
+      priceText: undefined,
       badge: "Most popular",
-      for: "Coming soon (for private and public repos)",
+      for: "For bigger Teams and Organizations",
       features: [
-        "Unlimited anonymous editors",
-        "Unlimited history",
-        "Unlimited private files",
-        "Unlimited annotations per file",
-        "Realtime collaboration",
-        "Custom Colibri ACCs (coming soon)",
-        "MDX support (coming soon)",
+        "Everything in Open source",
+        "Everything in Private",
+        "Permission handling (coming soon)",
+        "MDX support (coming soon)"
       ],
-      price: "$XX",
-      priceText: "per month per seat",
       cta: "Coming soon",
-      cta_type: "outline"
+      cta_type: "outline",
+      available: false,
     },
   ],
 };
@@ -83,25 +77,37 @@ const Pricing = () => {
       <h3 className="text-lg font-regular text-muted-foreground max-w-[480px] w-full mr-auto">{data.description}</h3>
       <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4 mt-12">
         {data.plans.map((plan) => (
-          <div key={plan.name} className="flex flex-col gap-2 bg-white rounded-2xl p-5">
-            <div>
-              <h4 className="text-md font-semibold">{plan.name}</h4>
-              <p className="text-sm font-regular text-muted-foreground leading-[0.8rem] pt-2">{plan.for}</p>
-            </div>
-            <ul className="list-disc list-inside pt-4 space-y-1 text-muted-foreground h-[200px]">
-              {plan.features.map((feature) => (
-                <li key={feature}>{feature}</li>
-              ))}
-            </ul>
-            <div className="flex items-end gap-4">
-              <h4 className="text-3xl font-semibold pt-[15px]">{plan.price}</h4>
-              <p className="text-sm font-regular text-muted-foreground leading-[0.8rem] pb-1.5">{plan.priceText}</p>
+          <div
+            key={plan.name}
+            className={`flex flex-col h-full gap-2 rounded-2xl border p-5 border-border ${plan.available ? "bg-white" : "bg-white/50 opacity-50"}`}
+          >
+            <div className="flex-1 flex flex-col gap-2">
+              <div>
+                <h4 className={`text-md font-semibold ${!plan.available ? "text-muted-foreground" : ""}`}>{plan.name}</h4>
+                <p className="text-sm font-regular text-muted-foreground leading-[0.8rem] pt-2">{plan.for}</p>
+              </div>
+              <ul className="list-disc list-inside pt-4 space-y-1 text-muted-foreground h-[200px]">
+                {plan.features.map((feature) => (
+                  <li key={feature}>{feature}</li>
+                ))}
+              </ul>
+              {(plan.price != null || plan.priceText != null) && (
+              <div className="flex items-end gap-4">
+                {plan.price != null && (
+                  <h4 className={`text-3xl font-semibold pt-[15px] ${!plan.available ? "text-muted-foreground" : ""}`}>{plan.price}</h4>
+                )}
+                {plan.priceText != null && plan.priceText !== "" && (
+                  <p className="text-sm font-regular text-muted-foreground leading-[0.8rem] pb-1.5">{plan.priceText}</p>
+                )}
+              </div>
+            )}
             </div>
             <Button
               variant={plan.cta_type as ButtonProps["variant"]}
               size="sm"
-              className="w-full mt-4"
-              onClick={() => handlePlanClick(plan.name, plan.price)}
+              className={`w-full mt-4 ${!plan.available ? "border-muted-foreground/40 text-muted-foreground cursor-not-allowed" : ""}`}
+              disabled={!plan.available}
+              onClick={plan.available ? () => handlePlanClick(plan.name, plan.price ?? "") : undefined}
             >
               {plan.cta}
             </Button>
