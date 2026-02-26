@@ -1,20 +1,19 @@
 "use client";
 
-import { Button } from "./ui/button";
 import posthog from "posthog-js";
 
 const navItems = [
   {
     label: "Features",
-    href: "/features",
+    href: "#features",
   },
   {
     label: "Pricing",
-    href: "/pricing",
+    href: "#pricing",
   },
   {
     label: "Get Started",
-    href: "/get-started",
+    href: "#get-started",
   },
 ];
 
@@ -32,26 +31,25 @@ const Footer = () => {
   return (
     <div className="w-full flex justify-between items-center px-4 py-2">
       <a
-        href="mailto:hello@colibri.com"
+        href="mailto:hello@get-colibri.com"
         className="text-sm text-muted-foreground hover:text-primary transition-colors"
         onClick={handleEmailClick}
       >
-        hello@colibri.com
+        hello@get-colibri.com
       </a>
-      <div>
+      <div className="flex items-center gap-1">
         {navItems.map((item) => (
-          <Button
+          <a
             key={item.href}
-            variant="ghost"
-            size="sm"
-            className="text-sm text-muted-foreground"
+            href={item.href}
+            className="text-sm text-muted-foreground hover:text-primary transition-colors px-2 py-1.5 rounded-md hover:bg-accent"
             onClick={() => handleFooterLinkClick(item.label)}
           >
             {item.label}
-          </Button>
+          </a>
         ))}
       </div>
-      <span className="text-sm text-muted-foreground">&copy; 2026 Colibri</span>
+      <span className="text-sm text-muted-foreground"> 2026 get-colibri</span>
     </div>
   );
 };

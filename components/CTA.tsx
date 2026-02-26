@@ -5,16 +5,19 @@ import posthog from "posthog-js";
 import { Input } from "./ui/input";
 import { useState } from "react";
 
+const DEFAULT_REPO_URL = "github.com/Legit-Control/get-colibri/blob/main/README.md";
+
 const CTA = () => {
   const [value, setValue] = useState("");
-
+//TODO: all the URl handle stuff should go into the backend so that we don't have to handle it here.
   const handleClick = () => {
+    const repo = value.trim() || DEFAULT_REPO_URL;
     posthog.capture("cta_clicked", {
       location: "main_cta",
-      repository: value,
+      repository: repo,
     });
 
-    const url = `https://app.get-colibri.com/?room_id=${value.replace("https://", "")}`;
+    const url = `https://app.get-colibri.com/?room_id=${encodeURIComponent(repo.replace("https://", ""))}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
